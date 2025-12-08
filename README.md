@@ -20,11 +20,9 @@ A privacy‑first, offline calendar and task manager that stores your data direc
 4. Start adding activities, recurring events, and customizing your setup.
 
 ## 📸 Screenshot
-Add a screenshot here to show the app in action:
 
-![Local Scheduler Screenshot](screenshot.png)
+![Local Scheduler Screenshot Dark Mode](Screenshot.png)
 
-*(Replace `screenshot.png` with the path to your actual screenshot.)*
 
 ## 🛡️ Privacy
 All data is stored locally on your device. Nothing is uploaded or shared.
