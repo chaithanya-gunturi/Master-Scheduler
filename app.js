@@ -62,6 +62,11 @@ const today = new Date();
 let currentMonth = today.getMonth();
 let currentYear = today.getFullYear();
 
+// ----- Utility: render text with clickable links -----
+function renderTextWithLinks(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.replace(urlRegex, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
+}
 
 
 // ----- Theme persistence -----
@@ -614,7 +619,7 @@ function renderActivities(displayActivities) {
 
     const titleEl = document.createElement("span");
     titleEl.className = "activity-title";
-    titleEl.textContent = act.title;
+    titleEl.innerHTML = renderTextWithLinks(act.title);
     header.appendChild(titleEl);
 
     if (act.isRecurring) {
@@ -643,7 +648,9 @@ function renderActivities(displayActivities) {
       };
 
       li.appendChild(cb);
-      li.appendChild(document.createTextNode(" " + item.text));
+      const span = document.createElement("span");
+      span.innerHTML = " " + renderTextWithLinks(item.text);
+      li.appendChild(span);
 
       // 🗑 Delete child item button
       const delItemBtn = document.createElement("button");
