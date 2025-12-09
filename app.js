@@ -638,7 +638,6 @@ function renderActivities(displayActivities) {
       cb.onchange = () => {
         item.done = cb.checked;
         autoSaveDay();
-
         activityDiv.classList.add("activity-updated");
         setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
@@ -651,10 +650,10 @@ function renderActivities(displayActivities) {
       delItemBtn.textContent = "🗑";
       delItemBtn.title = "Delete item";
       delItemBtn.onclick = () => {
+        item.done = false;
         act.items.splice(itemIdx, 1);
-        renderActivities(displayActivities);
         autoSaveDay();
-
+        renderActivities(buildDisplayActivities());
         activityDiv.classList.add("activity-updated");
         setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
@@ -671,9 +670,8 @@ function renderActivities(displayActivities) {
       editBtn.onclick = () => {
         const newTitle = prompt("New title?", act.title);
         if (newTitle) act.title = newTitle;
-        renderActivities(displayActivities);
         autoSaveDay();
-
+        renderActivities(buildDisplayActivities());
         activityDiv.classList.add("activity-updated");
         setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
@@ -682,12 +680,15 @@ function renderActivities(displayActivities) {
       const delBtn = document.createElement("button");
       delBtn.textContent = "🗑️ Delete";
       delBtn.onclick = () => {
-        displayActivities.splice(idx, 1);
-        renderActivities(displayActivities);
-        autoSaveDay();
-
-        activityDiv.classList.add("activity-updated");
-        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+        // 🔑 Delete from currentActivities (source of truth)
+        const i = currentActivities.findIndex(a => a === act);
+        if (i !== -1) {
+          currentActivities.splice(i, 1);
+          autoSaveDay();
+          renderActivities(buildDisplayActivities());
+          activityDiv.classList.add("activity-updated");
+          setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+        }
       };
       activityDiv.appendChild(delBtn);
 
@@ -697,9 +698,8 @@ function renderActivities(displayActivities) {
         const newItem = prompt("New checklist item?");
         if (newItem) {
           act.items.push({ text: newItem, done: false });
-          renderActivities(displayActivities);
           autoSaveDay();
-
+          renderActivities(buildDisplayActivities());
           activityDiv.classList.add("activity-updated");
           setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
         }
