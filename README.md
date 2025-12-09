@@ -1,5 +1,5 @@
-# 🗓️ Local Scheduler
-
+# 🗓️ Master Scheduler - Never Miss A Thing Again
+ 
 A privacy‑first, offline calendar and task manager that stores your data directly on your local drive — no cloud, no login, no tracking.
 
 ## ✨ Features
