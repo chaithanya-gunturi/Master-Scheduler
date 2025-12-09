@@ -90,9 +90,9 @@ reminderLeadInput.onchange = () => {
 notifyPermissionBtn.onclick = async () => {
   const res = await Notification.requestPermission();
   if (res === "granted") {
-    alert("Notifications enabled.");
+    showPopup("Notifications enabled.");
   } else {
-    alert("Notifications not enabled.");
+    showPopup("Notifications not enabled.");
   }
 };
 
@@ -166,11 +166,11 @@ async function initFolder() {
       await loadRecurring();
       renderCalendar(currentYear, currentMonth);
     } else {
-      alert("Folder permission denied. Choose a data folder to proceed.");
+      showPopup("Folder permission denied. Choose a data folder to proceed.");
     }
   } catch (err) {
     console.error("initFolder error:", err);
-    alert("Unable to access local storage folder. Please choose a data folder.");
+    showPopup("Unable to access local storage folder. Please choose a data folder.");
   }
 }
 initFolder();
@@ -506,7 +506,7 @@ let currentWeekStart = null;
 // ----- Day view (overlay recurring only for display) -----
 async function openDay(date) {
   if (!dataDirHandle) {
-    alert("Choose a data folder first.");
+    showPopup("Choose a data folder first.");
     return;
   }
 
@@ -533,7 +533,7 @@ async function openDay(date) {
 
 async function renderWeekView(startDate) {
   if (!dataDirHandle) {
-    alert("Choose a data folder first.");
+    showPopup("Choose a data folder first.");
     return;
   }
   weekViewEl.innerHTML = "";
@@ -727,7 +727,7 @@ addActivityBtn.onclick = () => {
 saveDayBtn.onclick = async () => {
   if (!currentFileHandle) return;
   await writeDayFile(currentFileHandle, currentActivities); // save only real activities
-  alert("Saved.");
+  showPopup("Saved.");
 };
 
 
@@ -756,7 +756,7 @@ settingsClose.onclick = () => {
 
 exportZipBtn.onclick = async () => {
   if (!dataDirHandle) {
-    alert("Choose your data folder first.");
+    showPopup("Choose your data folder first.");
     return;
   }
   const zip = new JSZip();
@@ -770,14 +770,14 @@ exportZipBtn.onclick = async () => {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  alert("Exported.");
+  showPopup("Exported.");
 };
 
 importZipInput.onchange = async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
   if (!dataDirHandle) {
-    alert("Choose your data folder first.");
+    showPopup("Choose your data folder first.");
     return;
   }
   const zip = await JSZip.loadAsync(file);
@@ -797,7 +797,7 @@ importZipInput.onchange = async (e) => {
     await writable.write(text);
     await writable.close();
   }
-  alert("Import complete.");
+  showPopup("Import complete.");
   importZipInput.value = "";
   await loadRecurring();
   if (currentDate) {
@@ -893,13 +893,13 @@ recSave.onclick = async () => {
     items: recItems.value.split(",").map(s => s.trim()).filter(Boolean)
   };
 
-  if (!ev.title) { alert("Title is required."); return; }
+  if (!ev.title) { showPopup("Title is required."); return; }
   if (ev.type === "weekly" && (ev.dayOfWeek == null || ev.dayOfWeek < 0 || ev.dayOfWeek > 6)) {
-    alert("For weekly events, set Day of week (0=Sun..6=Sat).");
+    showPopup("For weekly events, set Day of week (0=Sun..6=Sat).");
     return;
   }
   if (ev.type === "monthly" && (ev.dayOfMonth == null || ev.dayOfMonth < 1 || ev.dayOfMonth > 31)) {
-    alert("For monthly events, set Day of month (1–31).");
+    showPopup("For monthly events, set Day of month (1–31).");
     return;
   }
 
@@ -937,7 +937,7 @@ chooseFolderBtn.onclick = async () => {
       await applyCustomBackground();
       await loadRecurring();
       renderCalendar(currentYear, currentMonth);
-      alert("Data folder changed.");
+      showPopup("Data folder changed.");
     }
   } catch (err) { console.error(err); }
 };
@@ -959,8 +959,19 @@ reminderLeadInput.onchange = () => {
 notifyPermissionBtn.onclick = async () => {
   const res = await Notification.requestPermission();
   if (res === "granted") {
-    alert("Notifications enabled.");
+    showPopup("Notifications enabled.");
   } else {
-    alert("Notifications not enabled.");
+    showPopup("Notifications not enabled.");
   }
+};
+
+function showPopup(message) {
+  const overlay = document.getElementById("popup-overlay");
+  const msgEl = document.getElementById("popup-message");
+  msgEl.textContent = message;
+  overlay.classList.add("active");
+}
+
+document.getElementById("popup-close").onclick = () => {
+  document.getElementById("popup-overlay").classList.remove("active");
 };

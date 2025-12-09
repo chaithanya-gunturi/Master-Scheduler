@@ -446,3 +446,31 @@ justify-content: center;
 #today-btn:hover {
   background: var(--accent-hover, #16a34a);
 }
+
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.overlay.active {
+  display: flex;
+}
+
+.overlay-content {
+  background: var(--panel);  padding: 20px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+}
+
+#popup-message {
+  color: var(--text);
+  font-size: 1em;
+  line-height: 1.4;
+}
