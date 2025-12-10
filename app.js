@@ -39,6 +39,8 @@ const recCancel = document.getElementById("rec-cancel");
 const activityTemplate = document.getElementById("activity-template");
 const weekViewEl = document.getElementById("week-view");
 
+const recStart = document.getElementById("rec-start");
+const recEnd = document.getElementById("rec-end");
 
 
 const settingsBtn = document.getElementById("settings-btn");
@@ -339,28 +341,37 @@ async function saveRecurring() {
 
 // ----- Recurring matching (overlay only) -----
 function matchesRecurring(ev, date) {
+  const iso = date.toISOString().slice(0,10);
+
+  // Respect start/end bounds
+  if (ev.startDate && iso < ev.startDate) return false;
+  if (ev.endDate && iso > ev.endDate) return false;
+
   const dow = date.getDay();
   const dom = date.getDate();
 
   if (ev.type === "daily") {
-    const anchor = new Date(2020, 0, 1);
+    const anchor = new Date(ev.startDate || "2020-01-01");
     const daysDiff = Math.floor((date - anchor) / (1000 * 60 * 60 * 24));
     return daysDiff % (ev.interval || 1) === 0;
   }
+
   if (ev.type === "weekly") {
     if (dow !== ev.dayOfWeek) return false;
-    const anchor = new Date(2020, 0, 1);
+    const anchor = new Date(ev.startDate || "2020-01-01");
     const weeksDiff = Math.floor((date - anchor) / (1000 * 60 * 60 * 24 * 7));
     return weeksDiff % (ev.interval || 1) === 0;
   }
+
   if (ev.type === "monthly") {
     if (dom !== ev.dayOfMonth) return false;
-    const anchor = new Date(2020, 0, 1);
+    const anchor = new Date(ev.startDate || "2020-01-01");
     const monthsDiff =
       (date.getFullYear() - anchor.getFullYear()) * 12 +
       (date.getMonth() - anchor.getMonth());
     return monthsDiff % (ev.interval || 1) === 0;
   }
+
   return false;
 }
 
@@ -584,6 +595,7 @@ async function renderWeekView(startDate) {
 
 function buildDisplayActivities() {
   const display = [...currentActivities];
+
   if (currentDate) {
     recurringEvents.forEach(ev => {
       if (matchesRecurring(ev, currentDate)) {
@@ -591,11 +603,20 @@ function buildDisplayActivities() {
           title: ev.title,
           time: ev.time,
           items: (ev.items || []).map(t => ({ text: t, done: false })),
-          isRecurring: true 
+          isRecurring: true
         });
       }
     });
   }
+
+  // Sort by time, untimed last
+  display.sort((a, b) => {
+    if (!a.time && !b.time) return 0;
+    if (!a.time) return 1;
+    if (!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
+
   return display;
 }
 
@@ -604,17 +625,77 @@ function renderActivities(displayActivities) {
   const container = document.getElementById("activities");
   container.innerHTML = "";
 
-  displayActivities.forEach((act, idx) => {
-    const activityDiv = document.createElement("div");
-    activityDiv.className = "activity";
+  // Sort by time; untimed last
+  displayActivities.sort((a, b) => {
+    if (!a.time && !b.time) return 0;
+    if (!a.time) return 1;
+    if (!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
 
-    // Header: time + title + recurring label
+  let currentHour = null;
+  let noTimeHeaderRendered = false;
+
+  displayActivities.forEach(act => {
+    // Insert hour header or "No Time" header
+    if (act.time) {
+      const hour = act.time.split(":")[0];
+if (hour !== currentHour) {
+  currentHour = hour;
+  const block = document.createElement("div");
+  block.className = "hour-block";
+
+  // Header row container
+  const headerRow = document.createElement("div");
+  headerRow.className = "hour-header-row";
+
+  const label = document.createElement("h3");
+  label.textContent = `${hour}:00`;
+
+  // ➕ Quick add button
+  const addBtn = document.createElement("button");
+  addBtn.textContent = "➕";
+  addBtn.className = "add-hour-btn";
+  addBtn.title = "Add activity at this hour";
+  addBtn.onclick = () => {
+    const title = prompt("Activity title?");
+    if (!title) return;
+    const itemsRaw = prompt("Checklist items (comma separated)?") ?? "";
+    const items = itemsRaw.split(",").map(s => s.trim()).filter(Boolean)
+      .map(t => ({ text: t, done: false }));
+    const time = `${hour.padStart(2,"0")}:00`;
+    currentActivities.push({ title, time, items });
+    autoSaveDay();
+    renderActivities(buildDisplayActivities());
+  };
+
+  headerRow.appendChild(label);
+  headerRow.appendChild(addBtn);
+
+  block.appendChild(headerRow);
+  container.appendChild(block);
+}
+    } else if (!noTimeHeaderRendered) {
+      noTimeHeaderRendered = true;
+      const block = document.createElement("div");
+      block.className = "hour-block no-time";
+      const label = document.createElement("h3");
+      label.textContent = "No Time";
+      block.appendChild(label);
+      container.appendChild(block);
+    }
+
+    // Activity card
+    const activityDiv = document.createElement("div");
+    activityDiv.className = "activity " + (act.isRecurring ? "recurring" : "oneoff");
+
+    // Header
     const header = document.createElement("div");
     header.className = "activity-header";
 
     const timeEl = document.createElement("span");
     timeEl.className = "activity-time";
-    timeEl.textContent = act.time ? act.time : "";
+    timeEl.textContent = act.time || "";
     header.appendChild(timeEl);
 
     const titleEl = document.createElement("span");
@@ -631,38 +712,31 @@ function renderActivities(displayActivities) {
 
     activityDiv.appendChild(header);
 
-    // Checklist with delete child item
+    // Checklist
     const checklist = document.createElement("ul");
-    act.items.forEach((item, itemIdx) => {
+    (act.items || []).forEach((item, itemIdx) => {
       const li = document.createElement("li");
 
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = item.done;
-
       cb.onchange = () => {
         item.done = cb.checked;
         autoSaveDay();
-        activityDiv.classList.add("activity-updated");
-        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
-
       li.appendChild(cb);
+
       const span = document.createElement("span");
       span.innerHTML = " " + renderTextWithLinks(item.text);
       li.appendChild(span);
 
-      // 🗑 Delete child item button
       const delItemBtn = document.createElement("button");
       delItemBtn.textContent = "🗑";
       delItemBtn.title = "Delete item";
       delItemBtn.onclick = () => {
-        item.done = false;
         act.items.splice(itemIdx, 1);
         autoSaveDay();
         renderActivities(buildDisplayActivities());
-        activityDiv.classList.add("activity-updated");
-        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
       li.appendChild(delItemBtn);
 
@@ -670,7 +744,7 @@ function renderActivities(displayActivities) {
     });
     activityDiv.appendChild(checklist);
 
-    // Buttons only for non-recurring items
+    // Controls for non-recurring
     if (!act.isRecurring) {
       const editBtn = document.createElement("button");
       editBtn.textContent = "✏️ Edit";
@@ -679,22 +753,17 @@ function renderActivities(displayActivities) {
         if (newTitle) act.title = newTitle;
         autoSaveDay();
         renderActivities(buildDisplayActivities());
-        activityDiv.classList.add("activity-updated");
-        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
       };
       activityDiv.appendChild(editBtn);
 
       const delBtn = document.createElement("button");
       delBtn.textContent = "🗑️ Delete";
       delBtn.onclick = () => {
-        // 🔑 Delete from currentActivities (source of truth)
         const i = currentActivities.findIndex(a => a === act);
         if (i !== -1) {
           currentActivities.splice(i, 1);
           autoSaveDay();
           renderActivities(buildDisplayActivities());
-          activityDiv.classList.add("activity-updated");
-          setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
         }
       };
       activityDiv.appendChild(delBtn);
@@ -707,15 +776,515 @@ function renderActivities(displayActivities) {
           act.items.push({ text: newItem, done: false });
           autoSaveDay();
           renderActivities(buildDisplayActivities());
-          activityDiv.classList.add("activity-updated");
-          setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
         }
       };
       activityDiv.appendChild(addItemBtn);
     }
 
-    container.appendChild(activityDiv);
+    // Append to latest block
+    const blocks = container.querySelectorAll(".hour-block");
+    const target = blocks[blocks.length - 1] || container;
+    target.appendChild(activityDiv);
   });
+}
+
+// Helper: render a single activity card with full controls
+function renderActivityCard(act) {
+  const activityDiv = document.createElement("div");
+  activityDiv.className = "activity";
+
+  // Header: time + title + recurring label
+  const header = document.createElement("div");
+  header.className = "activity-header";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "activity-time";
+  timeEl.textContent = act.time || "";
+  header.appendChild(timeEl);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "activity-title";
+  titleEl.innerHTML = renderTextWithLinks(act.title);
+  header.appendChild(titleEl);
+
+  if (act.isRecurring) {
+    const recurringLabel = document.createElement("span");
+    recurringLabel.className = "recurring-label";
+    recurringLabel.textContent = "🔁 Recurring";
+    header.appendChild(recurringLabel);
+  }
+
+  activityDiv.appendChild(header);
+
+  // Checklist with delete child item
+  const checklist = document.createElement("ul");
+  (act.items || []).forEach((item, itemIdx) => {
+    const li = document.createElement("li");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = item.done;
+    cb.onchange = () => {
+      item.done = cb.checked;
+      autoSaveDay();
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(cb);
+
+    const span = document.createElement("span");
+    span.innerHTML = " " + renderTextWithLinks(item.text);
+    li.appendChild(span);
+
+    const delItemBtn = document.createElement("button");
+    delItemBtn.className = "btn-icon";
+    delItemBtn.textContent = "🗑";
+    delItemBtn.title = "Delete item";
+    delItemBtn.onclick = () => {
+      act.items.splice(itemIdx, 1);
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(delItemBtn);
+
+    checklist.appendChild(li);
+  });
+  activityDiv.appendChild(checklist);
+
+  // Controls bar (explicit, visible)
+  const controls = document.createElement("div");
+  controls.className = "activity-controls";
+
+  // For recurring overlay items, we show disabled controls (informative)
+  const isOverlay = !!act.isRecurring;
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "✏️ Edit";
+  editBtn.disabled = isOverlay;
+  editBtn.title = isOverlay ? "Edit real activities only" : "Edit activity";
+  editBtn.onclick = () => {
+    const newTitle = prompt("New title?", act.title);
+    if (newTitle) act.title = newTitle;
+    autoSaveDay();
+    renderActivities(buildDisplayActivities());
+    activityDiv.classList.add("activity-updated");
+    setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+  };
+  controls.appendChild(editBtn);
+
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "🗑️ Delete";
+  delBtn.disabled = isOverlay;
+  delBtn.title = isOverlay ? "Delete real activities only" : "Delete activity";
+  delBtn.onclick = () => {
+    const i = currentActivities.findIndex(a => a === act);
+    if (i !== -1) {
+      currentActivities.splice(i, 1);
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    }
+  };
+  controls.appendChild(delBtn);
+
+  const addItemBtn = document.createElement("button");
+  addItemBtn.textContent = "➕ Add item";
+  addItemBtn.disabled = false; // allow adding items to both; overlay items won't persist to file
+  addItemBtn.title = isOverlay
+    ? "Adds to display only (recurring overlay)"
+    : "Add checklist item";
+  addItemBtn.onclick = () => {
+    const newItem = prompt("New checklist item?");
+    if (newItem) {
+      act.items = act.items || [];
+      act.items.push({ text: newItem, done: false });
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    }
+  };
+  controls.appendChild(addItemBtn);
+
+  activityDiv.appendChild(controls);
+
+  return activityDiv;
+}
+
+// Helper: render a single activity card with full controls
+function renderActivityCard(act) {
+  const activityDiv = document.createElement("div");
+  activityDiv.className = "activity";
+
+  // Header: time + title + recurring label
+  const header = document.createElement("div");
+  header.className = "activity-header";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "activity-time";
+  timeEl.textContent = act.time || "";
+  header.appendChild(timeEl);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "activity-title";
+  titleEl.innerHTML = renderTextWithLinks(act.title);
+  header.appendChild(titleEl);
+
+  if (act.isRecurring) {
+    const recurringLabel = document.createElement("span");
+    recurringLabel.className = "recurring-label";
+    recurringLabel.textContent = "🔁 Recurring";
+    header.appendChild(recurringLabel);
+  }
+
+  activityDiv.appendChild(header);
+
+  // Checklist with delete child item
+  const checklist = document.createElement("ul");
+  act.items.forEach((item, itemIdx) => {
+    const li = document.createElement("li");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = item.done;
+    cb.onchange = () => {
+      item.done = cb.checked;
+      autoSaveDay();
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(cb);
+
+    const span = document.createElement("span");
+    span.innerHTML = " " + renderTextWithLinks(item.text);
+    li.appendChild(span);
+
+    // Delete checklist item
+    const delItemBtn = document.createElement("button");
+    delItemBtn.textContent = "🗑";
+    delItemBtn.title = "Delete item";
+    delItemBtn.onclick = () => {
+      act.items.splice(itemIdx, 1);
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(delItemBtn);
+
+    checklist.appendChild(li);
+  });
+  activityDiv.appendChild(checklist);
+
+  // Controls only for non-recurring items
+  if (!act.isRecurring) {
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "✏️ Edit";
+    editBtn.onclick = () => {
+      const newTitle = prompt("New title?", act.title);
+      if (newTitle) act.title = newTitle;
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    activityDiv.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "🗑️ Delete";
+    delBtn.onclick = () => {
+      // Safe delete using object reference in currentActivities
+      const i = currentActivities.findIndex(a => a === act);
+      if (i !== -1) {
+        currentActivities.splice(i, 1);
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+        activityDiv.classList.add("activity-updated");
+        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+      }
+    };
+    activityDiv.appendChild(delBtn);
+
+    const addItemBtn = document.createElement("button");
+    addItemBtn.textContent = "➕ Add Item";
+    addItemBtn.onclick = () => {
+      const newItem = prompt("New checklist item?");
+      if (newItem) {
+        act.items.push({ text: newItem, done: false });
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+        activityDiv.classList.add("activity-updated");
+        setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+      }
+    };
+    activityDiv.appendChild(addItemBtn);
+  }
+
+  return activityDiv;
+}
+
+// Helper: render a single activity card with full controls
+function renderActivityCard(act) {
+  const activityDiv = document.createElement("div");
+  activityDiv.className = "activity";
+
+  // Header: time + title + recurring label
+  const header = document.createElement("div");
+  header.className = "activity-header";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "activity-time";
+  timeEl.textContent = act.time || "";
+  header.appendChild(timeEl);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "activity-title";
+  titleEl.innerHTML = renderTextWithLinks(act.title);
+  header.appendChild(titleEl);
+
+  if (act.isRecurring) {
+    const recurringLabel = document.createElement("span");
+    recurringLabel.className = "recurring-label";
+    recurringLabel.textContent = "🔁 Recurring";
+    header.appendChild(recurringLabel);
+  }
+
+  activityDiv.appendChild(header);
+
+  // Checklist with delete child item
+  const checklist = document.createElement("ul");
+  act.items.forEach((item, itemIdx) => {
+    const li = document.createElement("li");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = item.done;
+    cb.onchange = () => {
+      item.done = cb.checked;
+      autoSaveDay();
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(cb);
+
+    const span = document.createElement("span");
+    span.innerHTML = " " + renderTextWithLinks(item.text);
+    li.appendChild(span);
+
+    // 🗑 Delete child item button
+    const delItemBtn = document.createElement("button");
+    delItemBtn.textContent = "🗑";
+    delItemBtn.title = "Delete item";
+    delItemBtn.onclick = () => {
+      act.items.splice(itemIdx, 1);
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(delItemBtn);
+
+    checklist.appendChild(li);
+  });
+  activityDiv.appendChild(checklist);
+
+  // Buttons only for non-recurring activities
+  if (!act.isRecurring) {
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "✏️ Edit";
+    editBtn.onclick = () => {
+      const newTitle = prompt("New title?", act.title);
+      if (newTitle) act.title = newTitle;
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+    };
+    activityDiv.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "🗑️ Delete";
+    delBtn.onclick = () => {
+      const i = currentActivities.findIndex(a => a === act);
+      if (i !== -1) {
+        currentActivities.splice(i, 1);
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+      }
+    };
+    activityDiv.appendChild(delBtn);
+
+    const addItemBtn = document.createElement("button");
+    addItemBtn.textContent = "➕ Add Item";
+    addItemBtn.onclick = () => {
+      const newItem = prompt("New checklist item?");
+      if (newItem) {
+        act.items.push({ text: newItem, done: false });
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+      }
+    };
+    activityDiv.appendChild(addItemBtn);
+  }
+
+  return activityDiv;
+}
+
+// Helper: render a single activity card with full controls
+function renderActivityCard(act) {
+  const activityDiv = document.createElement("div");
+  activityDiv.className = "activity";
+
+  // Header: time + title + recurring label
+  const header = document.createElement("div");
+  header.className = "activity-header";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "activity-time";
+  timeEl.textContent = act.time || "";
+  header.appendChild(timeEl);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "activity-title";
+  titleEl.innerHTML = renderTextWithLinks(act.title);
+  header.appendChild(titleEl);
+
+  if (act.isRecurring) {
+    const recurringLabel = document.createElement("span");
+    recurringLabel.className = "recurring-label";
+    recurringLabel.textContent = "🔁 Recurring";
+    header.appendChild(recurringLabel);
+  }
+
+  activityDiv.appendChild(header);
+
+  // Checklist with delete child item
+  const checklist = document.createElement("ul");
+  act.items.forEach((item, itemIdx) => {
+    const li = document.createElement("li");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = item.done;
+    cb.onchange = () => {
+      item.done = cb.checked;
+      autoSaveDay();
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(cb);
+
+    const span = document.createElement("span");
+    span.innerHTML = " " + renderTextWithLinks(item.text);
+    li.appendChild(span);
+
+    // 🗑 Delete child item button
+    const delItemBtn = document.createElement("button");
+    delItemBtn.textContent = "🗑";
+    delItemBtn.title = "Delete item";
+    delItemBtn.onclick = () => {
+      act.items.splice(itemIdx, 1);
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+      activityDiv.classList.add("activity-updated");
+      setTimeout(() => activityDiv.classList.remove("activity-updated"), 1000);
+    };
+    li.appendChild(delItemBtn);
+
+    checklist.appendChild(li);
+  });
+  activityDiv.appendChild(checklist);
+
+  // Buttons only for non-recurring activities
+  if (!act.isRecurring) {
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "✏️ Edit";
+    editBtn.onclick = () => {
+      const newTitle = prompt("New title?", act.title);
+      if (newTitle) act.title = newTitle;
+      autoSaveDay();
+      renderActivities(buildDisplayActivities());
+    };
+    activityDiv.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "🗑️ Delete";
+    delBtn.onclick = () => {
+      const i = currentActivities.findIndex(a => a === act);
+      if (i !== -1) {
+        currentActivities.splice(i, 1);
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+      }
+    };
+    activityDiv.appendChild(delBtn);
+
+    const addItemBtn = document.createElement("button");
+    addItemBtn.textContent = "➕ Add Item";
+    addItemBtn.onclick = () => {
+      const newItem = prompt("New checklist item?");
+      if (newItem) {
+        act.items.push({ text: newItem, done: false });
+        autoSaveDay();
+        renderActivities(buildDisplayActivities());
+      }
+    };
+    activityDiv.appendChild(addItemBtn);
+  }
+
+  return activityDiv;
+}
+
+// Helper: render a single activity card (reuse your existing logic)
+function renderActivityCard(act) {
+  const activityDiv = document.createElement("div");
+  activityDiv.className = "activity";
+
+  const header = document.createElement("div");
+  header.className = "activity-header";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "activity-time";
+  timeEl.textContent = act.time || "";
+  header.appendChild(timeEl);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "activity-title";
+  titleEl.innerHTML = renderTextWithLinks(act.title);
+  header.appendChild(titleEl);
+
+  if (act.isRecurring) {
+    const recurringLabel = document.createElement("span");
+    recurringLabel.className = "recurring-label";
+    recurringLabel.textContent = "🔁 Recurring";
+    header.appendChild(recurringLabel);
+  }
+
+  activityDiv.appendChild(header);
+
+  // Checklist
+  const checklist = document.createElement("ul");
+  act.items.forEach(item => {
+    const li = document.createElement("li");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = item.done;
+    cb.onchange = () => {
+      item.done = cb.checked;
+      autoSaveDay();
+    };
+    li.appendChild(cb);
+
+    const span = document.createElement("span");
+    span.innerHTML = " " + renderTextWithLinks(item.text);
+    li.appendChild(span);
+
+    checklist.appendChild(li);
+  });
+  activityDiv.appendChild(checklist);
+
+  return activityDiv;
 }
 
 // ----- Activity add/save -----
@@ -879,6 +1448,8 @@ function openRecurringModal(ev = null, index = null) {
   editingRecurringIndex = index;
   recTitle.value = ev?.title || "";
   recTime.value = ev?.time || "";
+  recStart.value = ev?.startDate || "";
+  recEnd.value = ev?.endDate || "";
   recType.value = ev?.type || "weekly";
   recInterval.value = ev?.interval || 1;
   recDow.value = ev?.dayOfWeek ?? "";
@@ -897,7 +1468,9 @@ recSave.onclick = async () => {
     interval: parseInt(recInterval.value, 10) || 1,
     dayOfWeek: recDow.value !== "" ? parseInt(recDow.value, 10) : null,
     dayOfMonth: recDom.value !== "" ? parseInt(recDom.value, 10) : null,
-    items: recItems.value.split(",").map(s => s.trim()).filter(Boolean)
+    items: recItems.value.split(",").map(s => s.trim()).filter(Boolean),
+    startDate: recStart.value || null,
+    endDate: recEnd.value || null   
   };
 
   if (!ev.title) { showPopup("Title is required."); return; }

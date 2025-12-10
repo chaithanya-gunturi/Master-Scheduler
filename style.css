@@ -482,3 +482,89 @@ justify-content: center;
   line-height: 1.4;
 
 }
+
+.hour-block {
+  margin-bottom: 16px;
+  border-top: 1px solid #ccc;
+  padding-top: 8px;
+}
+
+.hour-block h3 {
+  margin: 0 0 8px;
+  font-size: 1.1em;
+  color: var(--accent, #333);
+}
+
+.hour-block.no-time h3 {
+  color: #666;
+  font-style: italic;
+}
+
+.activity-header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.activity-title { flex: 1; min-width: 160px; }
+.activity button { margin-right: 6px; }
+.hour-block { margin-bottom: 16px; border-top: 1px solid #333; padding-top: 8px; }
+.hour-block h3 { margin: 0 0 8px; font-size: 1.05em; color: var(--accent, #ddd); }
+.hour-block.no-time h3 { color: #aaa; font-style: italic; }
+
+
+/* Sticky hour headers */
+.hour-block h3 {
+  position: sticky;
+  top: 0;
+  background: var(--card, #1e1e1e);
+  padding: 4px 8px;
+  z-index: 2;
+  border-bottom: 1px solid #333;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Timeline grid */
+.hour-block {
+  border-top: 1px solid #444;
+  padding-top: 8px;
+  margin-bottom: 16px;
+}
+.activity {
+  border-left: 2px solid var(--accent, #888);
+  margin-left: 12px;
+  padding-left: 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+/* Color coding */
+.activity.recurring {
+  background: rgba(0, 128, 255, 0.1);
+  border-color: #3399ff;
+}
+.activity.oneoff {
+  background: rgba(0, 255, 128, 0.1);
+  border-color: #33cc66;
+}
+
+/* Quick add button */
+.add-hour-btn {
+  font-size: 0.9em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid #666;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--accent, #ddd);
+}
+
+.add-hour-btn:hover {
+  background: var(--accent, #3399ff);
+  color: #fff;
+}
+
+
+.hour-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
