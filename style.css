@@ -653,3 +653,7 @@ justify-content: center;
   opacity: 0.6;
 }
 
+.activity.done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
