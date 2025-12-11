@@ -707,11 +707,12 @@ function renderActivities(displayActivities) {
   let noTimeHeaderRendered = false;
 
   displayActivities.forEach(act => {
-    // Insert hour header or "No Time" header
+    // Create hour header (or "No Time") when the hour changes
     if (act.time) {
       const hour = act.time.split(":")[0];
       if (hour !== currentHour) {
         currentHour = hour;
+
         const block = document.createElement("div");
         block.className = "hour-block";
 
@@ -721,13 +722,63 @@ function renderActivities(displayActivities) {
         const label = document.createElement("h3");
         label.textContent = `${hour}:00`;
 
-        // ➕ Quick add button (modal overlay version)
+        // ➕ Quick add button (modal overlay for this hour)
         const addBtn = document.createElement("button");
         addBtn.textContent = "➕";
         addBtn.className = "add-hour-btn";
         addBtn.title = "Add activity at this hour";
         addBtn.onclick = () => {
-          // (modal code from earlier)
+          const modal = document.createElement("div");
+          modal.className = "edit-modal";
+
+          const form = document.createElement("div");
+          form.className = "edit-form";
+
+          const titleLabel = document.createElement("label");
+          titleLabel.textContent = "Activity title:";
+          const titleInput = document.createElement("input");
+          titleInput.type = "text";
+          titleLabel.appendChild(titleInput);
+
+          const itemsLabel = document.createElement("label");
+          itemsLabel.textContent = "Checklist items (comma separated):";
+          const itemsInput = document.createElement("input");
+          itemsInput.type = "text";
+          itemsLabel.appendChild(itemsInput);
+
+          const saveBtn = document.createElement("button");
+          saveBtn.textContent = "Save";
+          saveBtn.onclick = () => {
+            const title = titleInput.value.trim();
+            if (!title) {
+              showPopup && showPopup("Please enter a title.");
+              return;
+            }
+            const itemsRaw = itemsInput.value || "";
+            const items = itemsRaw.split(",").map(s => s.trim()).filter(Boolean)
+              .map(t => ({ text: t, done: false }));
+            const time = `${hour.padStart(2, "0")}:00`;
+
+            currentActivities.push({ title, time, items, done: false });
+            autoSaveDay();
+            renderActivities(buildDisplayActivities());
+            document.body.removeChild(modal);
+          };
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.onclick = () => {
+            document.body.removeChild(modal);
+          };
+
+          form.appendChild(titleLabel);
+          form.appendChild(itemsLabel);
+          form.appendChild(saveBtn);
+          form.appendChild(cancelBtn);
+          modal.appendChild(form);
+          document.body.appendChild(modal);
+
+          titleInput.focus();
         };
 
         headerRow.appendChild(label);
@@ -739,9 +790,11 @@ function renderActivities(displayActivities) {
       noTimeHeaderRendered = true;
       const block = document.createElement("div");
       block.className = "hour-block no-time";
+
       const label = document.createElement("h3");
       label.textContent = "No Time";
       block.appendChild(label);
+
       container.appendChild(block);
     }
 
@@ -757,28 +810,31 @@ function renderActivities(displayActivities) {
     // Activity-level checkbox
     const activityCb = document.createElement("input");
     activityCb.type = "checkbox";
-    activityCb.checked = act.done || false;
+    activityCb.checked = !!act.done;
     activityCb.title = "Mark activity as done";
     activityCb.onchange = () => {
       act.done = activityCb.checked;
       if (act.done) {
-        (act.items || []).forEach(item => item.done = true);
+        (act.items || []).forEach(item => { item.done = true; });
       }
       autoSaveDay();
       renderActivities(buildDisplayActivities());
     };
     header.appendChild(activityCb);
 
+    // Time (can be empty for untimed)
     const timeEl = document.createElement("span");
     timeEl.className = "activity-time";
     timeEl.textContent = act.time || "";
     header.appendChild(timeEl);
 
+    // Title
     const titleEl = document.createElement("span");
     titleEl.className = "activity-title";
-    titleEl.innerHTML = renderTextWithLinks(act.title);
+    titleEl.innerHTML = renderTextWithLinks ? renderTextWithLinks(act.title) : act.title;
     header.appendChild(titleEl);
 
+    // Recurring badge (optional visual)
     if (act.isRecurring) {
       const recurringLabel = document.createElement("span");
       recurringLabel.className = "recurring-label";
@@ -788,14 +844,14 @@ function renderActivities(displayActivities) {
 
     activityDiv.appendChild(header);
 
-    // Checklist
+    // Checklist items
     const checklist = document.createElement("ul");
     (act.items || []).forEach((item, itemIdx) => {
       const li = document.createElement("li");
 
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.checked = item.done;
+      cb.checked = !!item.done;
       cb.onchange = () => {
         item.done = cb.checked;
         autoSaveDay();
@@ -803,7 +859,7 @@ function renderActivities(displayActivities) {
       li.appendChild(cb);
 
       const span = document.createElement("span");
-      span.innerHTML = " " + renderTextWithLinks(item.text);
+      span.innerHTML = " " + (renderTextWithLinks ? renderTextWithLinks(item.text) : item.text);
       li.appendChild(span);
 
       const delItemBtn = document.createElement("button");
@@ -820,12 +876,119 @@ function renderActivities(displayActivities) {
     });
     activityDiv.appendChild(checklist);
 
-    // Controls for non-recurring (edit, delete, add item)
+    // Controls for non-recurring activities
     if (!act.isRecurring) {
-      // (existing edit/delete/add item buttons)
+      // Edit button (modal overlay: title + time)
+      const editBtn = document.createElement("button");
+      editBtn.textContent = "✏️ Edit";
+      editBtn.onclick = () => {
+        const modal = document.createElement("div");
+        modal.className = "edit-modal";
+
+        const form = document.createElement("div");
+        form.className = "edit-form";
+
+        const titleLabel = document.createElement("label");
+        titleLabel.textContent = "Activity title:";
+        const titleInput = document.createElement("input");
+        titleInput.type = "text";
+        titleInput.value = act.title || "";
+        titleLabel.appendChild(titleInput);
+
+        const timeLabel = document.createElement("label");
+        timeLabel.textContent = "Time (HH:MM):";
+        const timeInput = document.createElement("input");
+        timeInput.type = "time";
+        timeInput.value = act.time || "";
+        timeLabel.appendChild(timeInput);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = () => {
+          act.title = titleInput.value.trim();
+          act.time = timeInput.value || "";
+          autoSaveDay();
+          renderActivities(buildDisplayActivities());
+          document.body.removeChild(modal);
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.onclick = () => {
+          document.body.removeChild(modal);
+        };
+
+        form.appendChild(titleLabel);
+        form.appendChild(timeLabel);
+        form.appendChild(saveBtn);
+        form.appendChild(cancelBtn);
+        modal.appendChild(form);
+        document.body.appendChild(modal);
+
+        titleInput.focus();
+      };
+      activityDiv.appendChild(editBtn);
+
+      // Delete button
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "🗑️ Delete";
+      delBtn.onclick = () => {
+        const i = currentActivities.findIndex(a => a === act);
+        if (i !== -1) {
+          currentActivities.splice(i, 1);
+          autoSaveDay();
+          renderActivities(buildDisplayActivities());
+        }
+      };
+      activityDiv.appendChild(delBtn);
+
+      // Add Item button (modal overlay)
+      const addItemBtn = document.createElement("button");
+      addItemBtn.textContent = "➕ Add Item";
+      addItemBtn.onclick = () => {
+        const modal = document.createElement("div");
+        modal.className = "edit-modal";
+
+        const form = document.createElement("div");
+        form.className = "edit-form";
+
+        const itemLabel = document.createElement("label");
+        itemLabel.textContent = "New checklist item:";
+        const itemInput = document.createElement("input");
+        itemInput.type = "text";
+        itemLabel.appendChild(itemInput);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = () => {
+          const newItem = itemInput.value.trim();
+          if (newItem) {
+            if (!act.items) act.items = [];
+            act.items.push({ text: newItem, done: false });
+            autoSaveDay();
+            renderActivities(buildDisplayActivities());
+          }
+          document.body.removeChild(modal);
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.onclick = () => {
+          document.body.removeChild(modal);
+        };
+
+        form.appendChild(itemLabel);
+        form.appendChild(saveBtn);
+        form.appendChild(cancelBtn);
+        modal.appendChild(form);
+        document.body.appendChild(modal);
+
+        itemInput.focus();
+      };
+      activityDiv.appendChild(addItemBtn);
     }
 
-    // Append to latest block
+    // Append to the latest block (sorted order ensures correct placement)
     const blocks = container.querySelectorAll(".hour-block");
     const target = blocks[blocks.length - 1] || container;
     target.appendChild(activityDiv);
