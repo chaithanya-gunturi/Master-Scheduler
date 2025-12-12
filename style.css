@@ -691,3 +691,93 @@ justify-content: center;
   flex-shrink: 0;
   margin: 8px;
 }
+
+.recurring-card {
+  border: 1px solid var(--border);
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--card-bg);
+  border-radius: 6px;
+}
+
+.recurring-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.recurring-repeat {
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.recurring-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.recurring-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.9em;
+  padding: 2px 6px;
+}
+
+.recurring-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.recurring-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9em;
+}
+
+.recurring-link button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 2px 6px;
+}
+
+.recurring-card {
+  border: 1px solid var(--border);
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--card-bg);
+  border-radius: 6px;
+}
+
+.recurring-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recurring-title {
+  font-weight: bold;
+  word-break: break-word;
+}
+
+.recurring-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.recurring-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.9em;
+  padding: 2px 6px;
+}

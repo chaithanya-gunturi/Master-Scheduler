@@ -1870,6 +1870,91 @@ function formatRecurringLabel(ev) {
   return parts.join(" ");
 }
 
+
+
+function buildPreviewText(rec) {
+  if (!rec) return "";
+
+  const intervalTxt = (unit) => rec.interval === 1 ? unit : `${rec.interval} ${unit}s`;
+
+  if (rec.type === "daily") {
+    return `Every ${intervalTxt("day")}`;
+  }
+  if (rec.type === "weekly") {
+    const days = (rec.daysOfWeek || [])
+      .map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]);
+    return `Every ${intervalTxt("week")} on ${days.join(", ")}`;
+  }
+  if (rec.type === "monthly") {
+    const days = (rec.daysOfMonth || [])
+      .map(d => `${d}${getOrdinalSuffix(d)}`);
+    return `Every ${intervalTxt("month")} on ${days.join(", ")}`;
+  }
+  return "";
+}
+
+function getOrdinalSuffix(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return "st";
+  if (n % 10 === 2 && n % 100 !== 12) return "nd";
+  if (n % 10 === 3 && n % 100 !== 13) return "rd";
+  return "th";
+}
+
+function buildPreviewText(rec) {
+  if (!rec) return "";
+
+  if (rec.type === "daily") {
+    return `Every ${rec.interval === 1 ? "day" : rec.interval + " days"}`;
+  }
+  if (rec.type === "weekly") {
+    const days = (rec.daysOfWeek || []).map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]);
+    return `Every ${rec.interval === 1 ? "week" : rec.interval + " weeks"} on ${days.join(", ")}`;
+  }
+  if (rec.type === "monthly") {
+    const days = (rec.daysOfMonth || []).map(d => d + getOrdinalSuffix(d));
+    return `Every ${rec.interval === 1 ? "month" : rec.interval + " months"} on ${days.join(", ")}`;
+  }
+  return "";
+}
+
+function getOrdinalSuffix(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return "st";
+  if (n % 10 === 2 && n % 100 !== 12) return "nd";
+  if (n % 10 === 3 && n % 100 !== 13) return "rd";
+  return "th";
+}
+
+function openRecurringEditModal(ev, idx) {
+  editingRecurringIndex = idx;
+
+  const rec = ev.recurrence || {};
+  recTitle.value = ev.title || "";
+  recTime.value = ev.time || "";
+  recStart.value = ev.startDate || "";
+  recEnd.value = ev.endDate || "";
+  recType.value = rec.type || "daily";
+  recInterval.value = rec.interval || 1;
+
+  // Show checklist texts, not [object Object]
+  recItems.value = (ev.items || [])
+    .map(i => typeof i === "string" ? i : (i.text || ""))
+    .filter(Boolean)
+    .join(", ");
+
+  // Preselect days of week/month
+  Array.from(recDow.options).forEach(opt => {
+    opt.selected = (rec.daysOfWeek || []).includes(parseInt(opt.value, 10));
+  });
+  Array.from(recDom.options).forEach(opt => {
+    opt.selected = (rec.daysOfMonth || []).includes(parseInt(opt.value, 10));
+  });
+
+  // Toggle relevant fields
+  recType.onchange();
+
+  recModal.classList.add("active");
+}
+
 function renderRecurring() {
   recurringListEl.innerHTML = "";
 
@@ -1877,51 +1962,60 @@ function renderRecurring() {
     const card = document.createElement("div");
     card.className = "recurring-card";
 
-    const left = document.createElement("div");
-    left.textContent = formatRecurringLabel(ev);
+    // Inner container for layout
+    const inner = document.createElement("div");
+    inner.className = "recurring-inner";
 
+    // Title block
+    const titleLine = document.createElement("div");
+    titleLine.className = "recurring-title";
+    titleLine.textContent = ev.title;
+    inner.appendChild(titleLine);
+
+    // Actions block
     const actions = document.createElement("div");
     actions.className = "recurring-actions";
 
     const editBtn = document.createElement("button");
-    editBtn.textContent = "✎";
-    editBtn.onclick = () => openRecurringModal(ev, i);
+    editBtn.textContent = "✎ Edit";
+    editBtn.className = "recurring-link";
+    editBtn.onclick = () => openRecurringEditModal(ev, i);
+    actions.appendChild(editBtn);
 
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "🗑";
-    delBtn.onclick = async () => {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "🗑 Cancel";
+    deleteBtn.className = "recurring-link";
+    deleteBtn.onclick = async () => {
       recurringEvents.splice(i, 1);
       await saveRecurring();
-      if (currentDate) {
-        renderActivities(buildDisplayActivities());
-      }
+      if (currentDate) renderActivities(buildDisplayActivities());
     };
+    actions.appendChild(deleteBtn);
 
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
-
-    card.appendChild(left);
-    card.appendChild(actions);
+    inner.appendChild(actions);
+    card.appendChild(inner);
     recurringListEl.appendChild(card);
   });
 }
 
 function openRecurringModal(ev = null, index = null) {
-  editingRecurringIndex = index;
-  recTitle.value = ev?.title || "";
-  recTime.value = ev?.time || "";
-  recStart.value = ev?.startDate || "";
-  recEnd.value = ev?.endDate || "";
-  recType.value = ev?.type || "weekly";
-  recInterval.value = ev?.interval || 1;
-  recDow.value = ev?.dayOfWeek ?? "";
-  recDom.value = ev?.dayOfMonth ?? "";
-  recItems.value = (ev?.items || []).join(", ");
-  recModal.classList.add("active");
+  // Redirect to the unified editor
+  openRecurringEditModal(
+    ev || {
+      title: "",
+      time: "",
+      startDate: "",
+      endDate: "",
+      recurrence: { type: "daily", interval: 1, daysOfWeek: [], daysOfMonth: [] },
+      items: []
+    },
+    index
+  );
 }
 recCancel.onclick = () => {
   recModal.classList.remove("active");
 };
+
 recSave.onclick = async () => {
   const title = recTitle.value.trim();
   if (!title) { showPopup("Title is required."); return; }
@@ -1930,18 +2024,20 @@ recSave.onclick = async () => {
   const type = recType.value;
   const interval = parseInt(recInterval.value, 10) || 1;
 
-  // Collect multiple selections from <select multiple>
   const daysOfWeek = Array.from(recDow.selectedOptions).map(opt => parseInt(opt.value, 10));
   const daysOfMonth = Array.from(recDom.selectedOptions).map(opt => parseInt(opt.value, 10));
 
-  // Build event object
   const ev = {
     id: editingRecurringIndex != null
       ? recurringEvents[editingRecurringIndex].id
       : `rec_${Date.now()}`,
     title,
     time,
-    items: recItems.value.split(",").map(s => s.trim()).filter(Boolean),
+    items: recItems.value
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(t => ({ text: t, done: false })),
     recurrence: {
       type,
       interval,
@@ -1952,7 +2048,6 @@ recSave.onclick = async () => {
     endDate: recEnd.value || null
   };
 
-  // Validation
   if (ev.recurrence.type === "weekly" && (!ev.recurrence.daysOfWeek || !ev.recurrence.daysOfWeek.length)) {
     showPopup("For weekly events, select at least one day of week.");
     return;
@@ -1962,7 +2057,6 @@ recSave.onclick = async () => {
     return;
   }
 
-  // Save or update
   if (editingRecurringIndex != null) {
     recurringEvents[editingRecurringIndex] = ev;
   } else {
@@ -1971,11 +2065,9 @@ recSave.onclick = async () => {
 
   await saveRecurring();
   recModal.classList.remove("active");
-
-  if (currentDate) {
-    renderActivities(buildDisplayActivities());
-  }
+  if (currentDate) renderActivities(buildDisplayActivities());
 };
+
 addRecurringBtn.onclick = () => openRecurringModal();
 
 // ----- Help overlay -----
@@ -2128,9 +2220,10 @@ function confirmDelete(message, onConfirm) {
 }
 
 // Default type = daily
-recType.value = "Daily";
+recType.value = "daily";
 document.getElementById("dow-label").style.display = "none";
 document.getElementById("dom-label").style.display = "none";
+
 
 // Toggle visibility based on type
 recType.onchange = () => {
@@ -2165,3 +2258,24 @@ addRecurringBtn.onclick = () => {
 
   recModal.classList.add("active");
 };
+
+
+const actions = document.createElement("div");
+actions.className = "recurring-actions";
+
+// Wrap each button in a span for icon + label alignment
+const editBtn = document.createElement("span");
+editBtn.className = "recurring-link";
+editBtn.innerHTML = `✎ <button>Edit</button>`;
+editBtn.querySelector("button").onclick = () => openRecurringEditModal(ev, i);
+actions.appendChild(editBtn);
+
+const deleteBtn = document.createElement("span");
+deleteBtn.className = "recurring-link";
+deleteBtn.innerHTML = `🗑 <button>Delete</button>`;
+deleteBtn.querySelector("button").onclick = async () => {
+  recurringEvents.splice(i, 1);
+  await saveRecurring();
+  if (currentDate) renderActivities(buildDisplayActivities());
+};
+actions.appendChild(deleteBtn);
