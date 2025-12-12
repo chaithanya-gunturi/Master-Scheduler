@@ -657,3 +657,37 @@ justify-content: center;
   opacity: 0.6;
   text-decoration: line-through;
 }
+
+/* The whole recurring pane */
+#recurring-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;          /* or 100vh if you want full viewport height */
+  max-height: 100vh;     /* ensures it never grows beyond screen */
+  border-left: 1px solid #ccc;
+}
+
+/* Section content */
+#recurring-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;      /* contain children */
+}
+
+/* Scrollable list */
+#recurring-list {
+  flex: 1;               /* take remaining space */
+  overflow-y: auto;      /* vertical scroll when long */
+  padding: 8px;
+  margin-bottom: 8px;
+  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Keep header and add button visible */
+#recurring-view h3,
+#add-recurring {
+  flex-shrink: 0;
+  margin: 8px;
+}
